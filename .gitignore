@@ -1,0 +1,26 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# crawl runtime data (on the SSD, never in repo)
+storage/
+data/
+corpus.db
+*.db
+*.db-wal
+*.db-shm
+*.jsonl
+
+# os / editor
+.DS_Store
+
+# local test scratch
+rtest/
+
+# local claude state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

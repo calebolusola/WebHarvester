@@ -1,0 +1,3 @@
+crawlee[beautifulsoup,adaptive-crawler,sql-postgres,sql-sqlite]>=1.7
+parsel>=1.9
+asyncpg>=0.30

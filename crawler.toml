@@ -1,0 +1,80 @@
+# nairaland board-scoped research crawl, single machine, own IP.
+# run:    .venv/bin/python -m crawler crawl --config crawler.toml
+# resume: same command (state is durable on the SSD)
+# watch:  .venv/bin/python -m crawler status --watch
+
+base_dir = "/Volumes/MainSSD/CRAWLER"
+db = "sqlite"
+
+# seed at the discussion boards with the richest human text. edit this list to
+# taste - add/remove boards. full board list: politics romance family career jobs
+# education health news crime christianity islam culture food diaries jokes
+# literature nysc science programming sports entertainment celebs fashion travel
+# gaming pets cartalk webmasters investment business agriculture phones computers
+seeds = [
+  "https://www.nairaland.com/politics",
+  "https://www.nairaland.com/romance",
+  "https://www.nairaland.com/family",
+  "https://www.nairaland.com/career",
+  "https://www.nairaland.com/jobs",
+  "https://www.nairaland.com/education",
+  "https://www.nairaland.com/health",
+  "https://www.nairaland.com/news",
+  "https://www.nairaland.com/crime",
+  "https://www.nairaland.com/culture",
+  "https://www.nairaland.com/food",
+  "https://www.nairaland.com/diaries",
+  "https://www.nairaland.com/jokes",
+  "https://www.nairaland.com/literature",
+  "https://www.nairaland.com/nysc",
+]
+
+# stay on nairaland. (footer links every board, so seeding boards biases what gets
+# crawled first; depth is what actually bounds the total.)
+strategy = "same-domain"
+
+# THE size knob. depth from each board seed:
+#   board page (0) -> threads + board pagination (1) -> their links (2) -> ...
+# 4 gets recent threads from each board + thread reply-pages + some cross-links.
+# raise for more history/breadth, lower for a quicker smaller pull. start here,
+# watch `status`, adjust.
+max_depth = 4
+
+# skip the stuff that isn't conversation: auth, post actions, search, ads,
+# marketplace/listing boards. keeps the crawl on actual text.
+exclude = [
+  "*nairaland.com/login*",
+  "*nairaland.com/register*",
+  "*nairaland.com/newtopic*",
+  "*nairaland.com/makenewpost*",
+  "*nairaland.com/reportpost*",
+  "*nairaland.com/editpost*",
+  "*nairaland.com/modifypost*",
+  "*nairaland.com/search*",
+  "*nairaland.com/follow*",
+  "*nairaland.com/noads*",
+  "*nairaland.com/ads*",
+  "*nairaland.com/howtoplaceads*",
+  "*nairaland.com/adrates*",
+  "*nairaland.com/techmarket*",
+  "*nairaland.com/properties*",
+  "*nairaland.com/do_*",
+]
+
+# politeness on one IP. honors 429 + crawl-delay, per-domain backoff.
+throttle = true
+domain_base_delay = 2.0
+domain_max_delay = 30.0
+
+# ONE domain + a per-domain throttle means we want ~1-2 requests in flight, NOT a
+# burst. pin both so the autoscaler can't ramp concurrency up (which it does when
+# workers look "idle" waiting on the throttle) and stampede nairaland into 429s.
+concurrency = 2
+max_concurrency = 2
+respect_robots = false
+browser = "chrome"
+store_html = false        # text only. flip on only if you want raw html (eats space)
+
+# small buffer so a hard crash (SSD hiccup, power) loses at most ~this many pages
+flush_max_records = 100
+flush_max_seconds = 1.0

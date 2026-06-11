@@ -1,0 +1,58 @@
+# annotated template. copy to crawler.toml and edit. cli flags override anything
+# here. precedence: defaults < this file < env (CRAWLER_*) < cli flags.
+# see crawler.toml in this repo for a real, tuned board-scoped nairaland crawl.
+
+# runtime data on an APFS (journaling) disk. MUST NOT be exfat - sqlite needs
+# real locking/fsync or it corrupts. the crawler refuses to run on exfat.
+base_dir = "/Volumes/MainSSD/CRAWLER"
+
+# single machine: "sqlite" (a file under base_dir, zero infra).
+# mesh: point every machine at one postgres on your LAN, e.g.
+# db = "postgresql+asyncpg://crawler:secret@192.168.1.50:5432/crawler"
+db = "sqlite"
+
+# what to crawl
+seeds = ["https://www.nairaland.com"]
+strategy = "same-domain"        # stay on the seed's site
+# allowed_domains = ["nairaland.com"]
+# include = ["*nairaland.com/politics*"]
+# exclude = ["*nairaland.com/login*", "*nairaland.com/techmarket*"]
+# max_depth = 4                 # THE size knob; omit for unlimited
+# max_pages = 0                 # omit for unlimited
+
+# performance / politeness. IMPORTANT for a single strict site on one IP:
+# keep concurrency low and PINNED (concurrency == max_concurrency). otherwise the
+# autoscaler ramps it up while workers idle on the throttle, stampedes the site,
+# and gets your IP rate-limited (429 storm). raise it only when crawling many
+# domains or going through proxies.
+concurrency = 4
+max_concurrency = 4
+rate = 0                        # requests/min cap, 0 = uncapped
+parse_workers = 0               # extraction process pool, 0 = all cores
+render = false                  # true = playwright fallback for js pages
+
+# per-domain backoff that honors HTTP 429 + robots crawl-delay. this is what
+# keeps a strict site from rate-limiting you into the ground. on one IP it
+# effectively serializes that domain (slow but steady); use proxies for speed.
+throttle = true
+domain_base_delay = 1.0
+domain_max_delay = 30.0
+
+# corpus writer: batches writes so the DB never touches the crawl hot path.
+# kept small so a hard crash (SSD hiccup, power) loses at most this many pages.
+flush_max_records = 100
+flush_max_seconds = 1.0
+store_html = false              # text only. true keeps raw gzipped html (eats space)
+unlogged_corpus = false         # postgres only: faster bulk load, less durable
+
+# self healing / set and forget
+retries = 8
+max_session_rotations = 12
+session_pool_size = 1000
+keep_alive = false              # set true on mesh nodes so they wait for peers
+respect_robots = true
+
+# anti blocking
+browser = "chrome"              # impit impersonation target, or "none"
+# proxies = ["http://user:pass@proxy1:8000", "http://user:pass@proxy2:8000"]
+# proxy_tiers = [["http://dc1:8000","http://dc2:8000"], ["http://res1:8000"]]
