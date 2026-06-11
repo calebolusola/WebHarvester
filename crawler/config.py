@@ -1,7 +1,11 @@
 import os
 import socket
-import tomllib
 from dataclasses import dataclass, field, replace
+
+try:
+    import tomllib
+except ModuleNotFoundError:        # python < 3.11 (e.g. ubuntu 22.04)
+    import tomli as tomllib
 
 DEFAULT_BASE_DIR = "/Volumes/MainSSD/CRAWLER"
 

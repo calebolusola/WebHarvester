@@ -21,6 +21,9 @@ corpus.db
 # local test scratch
 rtest/
 
+# mesh node secrets (postgres dsn + password)
+mesh.env
+
 # local claude state
 .claude/settings.local.json
 .claude/scheduled_tasks.lock

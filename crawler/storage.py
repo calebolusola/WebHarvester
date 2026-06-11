@@ -174,18 +174,15 @@ class PgBackend(Backend):
             await con.execute("TRUNCATE corpus, crawl_errors, node_heartbeat")
 
     async def write_corpus(self, rows):
+        # batched parameterized INSERT. (COPY is faster in theory but its binary
+        # protocol fights the jsonb text codec and throws InternalClientError; at
+        # ~100 pages/min/node executemany is plenty fast and just works.)
+        ph = ",".join(f"${i + 1}" for i in range(len(CORPUS_COLS)))
+        sql = (f"INSERT INTO corpus ({','.join(CORPUS_COLS)}) VALUES ({ph}) "
+               "ON CONFLICT (url) DO NOTHING")
         records = [tuple(_pg_value(c, r.get(c)) for c in CORPUS_COLS) for r in rows]
         async with self.pool.acquire() as con:
-            # COPY is the fastest path into postgres. land into a temp table then
-            # upsert so re-seen urls don't blow up on the primary key
-            await con.execute("CREATE TEMP TABLE IF NOT EXISTS _corpus_in "
-                              "(LIKE corpus INCLUDING DEFAULTS) ON COMMIT DELETE ROWS")
-            async with con.transaction():
-                await con.copy_records_to_table("_corpus_in", records=records, columns=CORPUS_COLS)
-                await con.execute(
-                    "INSERT INTO corpus SELECT * FROM _corpus_in "
-                    "ON CONFLICT (url) DO NOTHING"
-                )
+            await con.executemany(sql, records)
 
     async def write_errors(self, rows):
         async with self.pool.acquire() as con:

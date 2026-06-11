@@ -38,15 +38,21 @@ python3 -m venv .venv
 
 mkdir -p "$HOME/crawldata"
 
+# write mesh.env so the node joins the shared frontier with a plain ./run.sh
+cat > mesh.env <<EOF
+CRAWLER_DB="$PG_DSN"
+CRAWLER_KEEP_ALIVE=true
+CRAWLER_BASE_DIR="\$HOME/crawldata"
+EOF
+
 cat <<EOF
 
-[bootstrap] done.
+[bootstrap] done. mesh.env written.
 
-start the node (reuses the repo's crawler.toml, overrides db + dirs via env):
+start the node (auto-loads mesh.env, joins the shared frontier):
 
   cd ~/webharvester
-  CRAWLER_DB="$PG_DSN" CRAWLER_BASE_DIR="\$HOME/crawldata" CRAWLER_KEEP_ALIVE=true \\
-    tmux new -s crawler -d './run.sh'
+  tmux new -s crawler -d './run.sh'
 
 watch it:    tmux attach -t crawler        (ctrl-b d to detach)
 mesh status: .venv/bin/python -m crawler status --db "$PG_DSN" --watch
