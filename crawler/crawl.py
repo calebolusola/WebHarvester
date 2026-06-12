@@ -144,6 +144,15 @@ async def run_crawl(cfg: Config):
     )
     storage_client = build_storage_client(cfg)
 
+    # set these GLOBALLY, not just on the crawler. the ThrottlingRequestManager
+    # builds its per-domain sub-queues from service_locator.get_storage_client(),
+    # so without this the throttled domain (nairaland) lands in each node's LOCAL
+    # filesystem queue instead of the shared postgres one -> every node re-crawls
+    # the same pages and the mesh silently does no real distribution.
+    from crawlee import service_locator
+    service_locator.set_configuration(configuration)
+    service_locator.set_storage_client(storage_client)
+
     backend = await open_backend(cfg)
     await backend.init_schema()
     if cfg.fresh:
