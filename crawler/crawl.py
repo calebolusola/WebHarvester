@@ -29,8 +29,13 @@ def _http_client(cfg: Config):
 def _proxy(cfg: Config):
     if cfg.proxy_tiers:
         return ProxyConfiguration(tiered_proxy_urls=[list(t) for t in cfg.proxy_tiers])
-    if cfg.proxies:
-        return ProxyConfiguration(proxy_urls=list(cfg.proxies))
+    urls = list(cfg.proxies)
+    if cfg.proxies_file and os.path.exists(cfg.proxies_file):
+        # one proxy per line. refresh the pool by rewriting the file, no config edit.
+        with open(cfg.proxies_file) as f:
+            urls += [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
+    if urls:
+        return ProxyConfiguration(proxy_urls=urls)
     return None
 
 

@@ -63,6 +63,7 @@ class Config:
     browser: str = "chrome"        # impit impersonation target, or "none"
     proxies: tuple = ()
     proxy_tiers: tuple = ()        # tuple of tuples, escalates when blocked
+    proxies_file: str = ""         # load proxies (one per line) from this file, merged with proxies
 
     fresh: bool = False            # wipe state and start over
 

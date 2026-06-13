@@ -40,6 +40,7 @@ def _overrides(args) -> dict:
         "browser": args.browser,
         "proxies": tuple(args.proxy) if args.proxy else None,
         "proxy_tiers": _split_commas(args.proxy_tier),
+        "proxies_file": args.proxy_file,
         "fresh": args.fresh,
     }
     if args.no_robots:
@@ -83,6 +84,7 @@ def _add_crawl_flags(p):
     p.add_argument("--browser", help="impit impersonation target (default chrome), or 'none'")
     p.add_argument("--proxy", action="append", help="proxy url to rotate, repeatable")
     p.add_argument("--proxy-tier", action="append", help="tier of comma-separated proxies, repeatable")
+    p.add_argument("--proxy-file", help="file of proxy urls, one per line")
     p.add_argument("--fresh", action="store_const", const=True, default=None, help="wipe state, start over")
 
 
