@@ -1,4 +1,31 @@
+from urllib.parse import urlsplit
+
 from .base import clean_text, page_title
+
+# nairaland boards/sections/nav. any other single-segment path (/SomeUsername)
+# is a user profile - lots of pages, little unique text, redundant with threads.
+NAIRALAND_SECTIONS = {
+    "ads", "agriculture", "autos", "business", "career", "cartalk", "celebs",
+    "christianity", "computers", "crime", "culture", "diaries", "education",
+    "entertainment", "events", "family", "fashion", "food", "gaming", "health",
+    "howtoplaceads", "investment", "islam", "jobs", "jokes", "literature", "login",
+    "nairaland", "news", "nysc", "pets", "phones", "politics", "programming",
+    "properties", "recent", "register", "romance", "science", "sports", "techmarket",
+    "topics", "travel", "trending", "webmasters", "search", "newtopic", "noads",
+}
+
+
+def is_profile_url(url: str) -> bool:
+    """True for nairaland user-profile pages (/Username) we want to skip."""
+    parts = urlsplit(url)
+    if "nairaland.com" not in (parts.hostname or "").lower():
+        return False
+    seg = parts.path.strip("/")
+    if not seg or "/" in seg:        # homepage, or multi-segment (thread/board page)
+        return False
+    if seg[0].isdigit():             # /<id> is a thread, keep
+        return False
+    return seg.lower() not in NAIRALAND_SECTIONS   # single-segment non-section = profile
 
 # nairaland is old-school table markup. a post is an author/timestamp header
 # cell followed by a body cell holding <div class="narrow">. authors that appear

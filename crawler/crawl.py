@@ -221,6 +221,15 @@ async def run_crawl(cfg: Config):
     exclude = [Glob(g) for g in cfg.exclude]
     strategy = cfg.strategy
 
+    transform = None
+    if cfg.skip_profiles:
+        from .extract.nairaland import is_profile_url
+
+        def transform(req):
+            # 'skip' drops the request, 'unchanged' keeps it. profiles look like
+            # boards by url (both single-segment) so a glob can't catch them.
+            return "skip" if is_profile_url(req["url"]) else "unchanged"
+
     @crawler.router.default_handler
     async def handler(context: BeautifulSoupCrawlingContext):
         # discover links cheaply (crawlee handles depth, strategy, dedup, globs)
@@ -228,6 +237,7 @@ async def run_crawl(cfg: Config):
             strategy=strategy,
             include=include or None,
             exclude=exclude or None,
+            transform_request_function=transform,
         )
         # heavy lifting (parse + structure) goes to the process pool.
         # in render mode the rendered DOM is in parsed_content, not the static body

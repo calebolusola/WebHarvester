@@ -31,6 +31,7 @@ class Config:
     exclude: tuple = ()            # url globs that must not match
     max_depth: int | None = None
     max_pages: int | None = None
+    skip_profiles: bool = False     # drop nairaland /Username profile pages at enqueue time
 
     # performance
     concurrency: int = 50          # desired in-flight requests
