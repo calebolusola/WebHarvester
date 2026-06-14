@@ -90,7 +90,8 @@ def extract(tree) -> dict:
         cls = el.get("class") or ""
         if el.tag == "a" and "user" in cls and not _is_in_narrow(el):
             authors.append(el)
-        elif el.tag == "span" and ("s" in cls.split() or "m" in cls.split()) and not _is_in_narrow(el):
+        elif el.tag == "span" and "s" in cls.split() and not _is_in_narrow(el):
+            # span.s is the timestamp; span.m is a role badge (op/mod), skip it
             stamps.append(el)
         elif el.tag == "div" and "narrow" in cls.split():
             bodies.append(el)
