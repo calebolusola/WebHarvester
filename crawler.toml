@@ -40,6 +40,9 @@ strategy = "same-domain"
 # watch `status`, adjust.
 max_depth = 4
 
+# /Username profile pages are a third of the crawl and barely any unique text. skip them.
+skip_profiles = true
+
 # skip the stuff that isn't conversation: auth, post actions, search, ads,
 # marketplace/listing boards. keeps the crawl on actual text.
 exclude = [
