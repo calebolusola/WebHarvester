@@ -37,9 +37,13 @@ def _render(s: dict) -> str:
         out.append("  (none reporting yet)")
     for n in s["nodes"]:
         age = s["now"] - (n["ts"] or 0)
-        live = "live" if age < 20 else f"stale {int(age)}s"
+        stale = age >= 20
+        live = "live" if not stale else f"stale {int(age)}s"
+        # a stale node's last-reported rate is frozen, not current. zero it so it
+        # doesn't look like a dead node is still pulling pages.
+        rate = 0.0 if stale else (n["rate"] or 0)
         out.append(f"  {n['node_id']:<20} done {n['pages_done']:>9,}  "
-                   f"{(n['rate'] or 0):6.1f}/s  [{n['status']}, {live}]")
+                   f"{rate:6.1f}/s  [{n['status']}, {live}]")
 
     if s["domains"]:
         out.append("\ntop domains:")
