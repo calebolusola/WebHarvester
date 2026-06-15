@@ -183,6 +183,8 @@ async def run_crawl(cfg: Config):
         max_requests_per_crawl=cfg.max_pages,
         max_crawl_depth=cfg.max_depth,
         respect_robots_txt_file=cfg.respect_robots,
+        # 404/410 are permanent. don't retry them 8x, just mark handled and move on.
+        ignore_http_error_status_codes=[404, 410],
         # self-healing: rotate fingerprint+cookies on blocks, keep going
         use_session_pool=True,
         session_pool=SessionPool(max_pool_size=cfg.session_pool_size),
@@ -232,6 +234,10 @@ async def run_crawl(cfg: Config):
 
     @crawler.router.default_handler
     async def handler(context: BeautifulSoupCrawlingContext):
+        # 404/410 reach here (we told crawlee to ignore them, not retry). nothing
+        # to store or follow on a dead page, so mark handled and move on.
+        if context.http_response.status_code != 200:
+            return
         # discover links cheaply (crawlee handles depth, strategy, dedup, globs)
         await context.enqueue_links(
             strategy=strategy,
