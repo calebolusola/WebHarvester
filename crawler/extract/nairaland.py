@@ -15,17 +15,24 @@ NAIRALAND_SECTIONS = {
 }
 
 
+# per-user listings hanging off a profile: /Username/posts/2, /Username/topics
+USER_LISTINGS = {"posts", "topics"}
+
+
 def is_profile_url(url: str) -> bool:
-    """True for nairaland user-profile pages (/Username) we want to skip."""
+    """True for nairaland user-profile pages (/Username and its post/topic lists) we skip."""
     parts = urlsplit(url)
     if "nairaland.com" not in (parts.hostname or "").lower():
         return False
-    seg = parts.path.strip("/")
-    if not seg or "/" in seg:        # homepage, or multi-segment (thread/board page)
+    segs = parts.path.strip("/").split("/")
+    first = segs[0]
+    if not first or first[0].isdigit():      # homepage, or /<id>/... which is a thread
         return False
-    if seg[0].isdigit():             # /<id> is a thread, keep
+    if first.lower() in NAIRALAND_SECTIONS:  # a board or site section (and its pages)
         return False
-    return seg.lower() not in NAIRALAND_SECTIONS   # single-segment non-section = profile
+    # /Username on its own is the profile. /Username/posts etc is that user's
+    # post history, which is just thread posts again, grouped by author
+    return len(segs) == 1 or segs[1].lower() in USER_LISTINGS
 
 # nairaland is old-school table markup. a post is an author/timestamp header
 # cell followed by a body cell holding <div class="narrow">. authors that appear
