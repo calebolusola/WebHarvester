@@ -43,6 +43,7 @@ domain_max_delay = 30.0
 flush_max_records = 100
 flush_max_seconds = 1.0
 store_html = false              # text only. true keeps raw gzipped html (eats space)
+store_generic = false           # sites with their own extractor: skip pages it can't parse (profiles, listings)
 unlogged_corpus = false         # postgres only: faster bulk load, less durable
 
 # self healing / set and forget

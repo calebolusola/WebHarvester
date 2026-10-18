@@ -17,6 +17,10 @@ def _pick(url: str):
     return generic_extract
 
 
+def has_site_extractor(url: str) -> bool:
+    return _pick(url) is not generic_extract
+
+
 def extract_record(url: str, html: bytes, http_status: int, store_html: bool) -> dict:
     # top-level, picklable entry point for the process pool
     return build_record(url, html, http_status, store_html, _pick(url))

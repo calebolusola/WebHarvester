@@ -30,6 +30,7 @@ def _overrides(args) -> dict:
         "flush_max_records": args.flush_records,
         "flush_max_seconds": args.flush_seconds,
         "store_html": args.store_html,
+        "store_generic": args.store_generic,
         "unlogged_corpus": args.unlogged_corpus,
         "retries": args.retries,
         "max_session_rotations": args.max_session_rotations,
@@ -71,6 +72,8 @@ def _add_crawl_flags(p):
     p.add_argument("--flush-records", type=int)
     p.add_argument("--flush-seconds", type=float)
     p.add_argument("--store-html", action="store_const", const=True, default=None)
+    p.add_argument("--store-generic", action="store_const", const=True, default=None,
+                   help="on sites with their own extractor, also store pages it can't parse")
     p.add_argument("--unlogged-corpus", action="store_const", const=True, default=None)
     p.add_argument("--retries", type=int)
     p.add_argument("--max-session-rotations", type=int)

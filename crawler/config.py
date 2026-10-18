@@ -44,6 +44,10 @@ class Config:
     flush_max_records: int = 500   # flush when buffer hits this many
     flush_max_seconds: float = 2.0 # ...or this long since last flush
     store_html: bool = False       # also keep raw gzipped html
+    # on sites with their own extractor (nairaland), also store the pages it can't
+    # parse: profiles, board listings, login walls. off = links still get followed,
+    # the page just isn't written. sites with no extractor store everything either way
+    store_generic: bool = False
     unlogged_corpus: bool = False  # postgres UNLOGGED corpus table, faster, less durable
 
     # self healing / set-and-forget

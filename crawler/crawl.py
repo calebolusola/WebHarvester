@@ -14,7 +14,7 @@ from crawlee.sessions import SessionPool
 
 from .config import Config
 from .corpus import BufferedCorpusWriter
-from .extract import extract_record
+from .extract import extract_record, has_site_extractor
 from .storage import build_storage_client, open_backend
 
 
@@ -266,6 +266,11 @@ async def run_crawl(cfg: Config):
             pool, extract_record, context.request.url, html,
             context.http_response.status_code, cfg.store_html,
         )
+        # the site's own extractor couldn't make sense of this page (profile, board
+        # listing, login wall). links above are already queued, just don't keep it
+        if (record.get("extractor") in ("generic", "error") and not cfg.store_generic
+                and has_site_extractor(context.request.url)):
+            return
         record["domain"] = (context.request.url.split("/")[2] if "//" in context.request.url else "")
         record["node_id"] = cfg.node_id
         record["fetched_at"] = time.time()
