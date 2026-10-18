@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# bootstrap a WebHarvester crawler node on a fresh ubuntu VM (e.g. oracle free tier).
+# bootstrap a WebHarvester crawler node on a fresh ubuntu box (any vps works).
 #
 # set REPO_URL and PG_DSN, then run:
 #   export REPO_URL="git@github.com:YOURNAME/WebHarvester.git"
-#   export PG_DSN="postgresql+asyncpg://crawler:PASS@100.x.y.z:5432/crawler"
+#   export PG_DSN="postgresql+asyncpg://crawler:PASS@100.x.y.z:5433/crawler"
 #   bash bootstrap-node.sh
 #
 # it installs deps, joins tailscale, clones the code, and builds the venv.

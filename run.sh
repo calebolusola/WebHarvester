@@ -8,7 +8,7 @@ set -u
 cd "$(dirname "$0")"
 
 # if a mesh.env exists, load it. that is how a node joins the shared postgres
-# frontier: same mesh.env on every machine (mac, dell, oracle vm) -> one crawl.
+# frontier: same mesh.env on every machine (mac, dell, vps) -> one crawl.
 # it sets CRAWLER_DB (the postgres dsn), CRAWLER_KEEP_ALIVE, CRAWLER_BASE_DIR.
 # env vars override crawler.toml, so the boards/throttle/depth tuning is reused.
 if [ -f mesh.env ]; then
