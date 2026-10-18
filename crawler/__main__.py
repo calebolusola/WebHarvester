@@ -130,6 +130,50 @@ async def _cmd_reconcile(args):
     print(f"re-enqueued {len(urls)} previously-failed urls")
 
 
+# crawlee keeps the depth inside the stored request json, not in its own column
+_DEPTH = "COALESCE((data::jsonb #>> '{user_data,__crawlee,crawlDepth}')::int, 0)"
+
+
+async def _cmd_reopen(args):
+    # mark already-handled pages at the edge of a depth-capped crawl as pending
+    # again. crawlee drops links past max_depth, so those pages never queued their
+    # children. refetching them with a higher (or no) cap picks the links back up,
+    # and dedup still skips every page that's already been crawled.
+    import asyncpg
+    from .storage import _asyncpg_dsn
+    cfg = configmod.load(args.config, **_overrides_min(args))
+    if not cfg.is_postgres:
+        raise SystemExit("reopen only works against the postgres mesh for now")
+    con = await asyncpg.connect(_asyncpg_dsn(cfg.db), command_timeout=None)
+    try:
+        depth = args.depth
+        if depth is None:
+            depth = await con.fetchval(f"SELECT MAX({_DEPTH}) FROM request_queue_records")
+        n = await con.fetchval(
+            f"SELECT COUNT(*) FROM request_queue_records WHERE is_handled AND {_DEPTH} >= $1", depth)
+        print(f"{n:,} handled pages at depth >= {depth}")
+        if args.dry_run or not n:
+            return
+        async with con.transaction():
+            res = await con.execute(
+                "UPDATE request_queue_records "
+                "SET is_handled = false, time_blocked_until = NULL, client_key = NULL "
+                f"WHERE is_handled AND {_DEPTH} >= $1", depth)
+            # crawlee decides a queue is empty from the counters on its metadata
+            # row, not the records. rebuild them or nodes think there's no work.
+            await con.execute(
+                "UPDATE request_queues q SET "
+                "pending_request_count = (SELECT COUNT(*) FROM request_queue_records r "
+                "  WHERE r.request_queue_id = q.request_queue_id AND NOT r.is_handled), "
+                "handled_request_count = (SELECT COUNT(*) FROM request_queue_records r "
+                "  WHERE r.request_queue_id = q.request_queue_id AND r.is_handled), "
+                "total_request_count = (SELECT COUNT(*) FROM request_queue_records r "
+                "  WHERE r.request_queue_id = q.request_queue_id)")
+        print(f"reopened {int(res.split()[-1]):,} pages. restart the crawlers to pick them up")
+    finally:
+        await con.close()
+
+
 def _overrides_min(args):
     # status/init-db/reconcile only need to locate the data
     m = {"base_dir": getattr(args, "base_dir", None), "db": getattr(args, "db", None)}
@@ -164,6 +208,14 @@ def main():
     p.add_argument("--base-dir")
     p.add_argument("--db")
     p.set_defaults(func=_cmd_reconcile)
+
+    p = sub.add_parser("reopen", help="re-queue pages at the depth edge so a deeper crawl can continue")
+    p.add_argument("--config")
+    p.add_argument("--base-dir")
+    p.add_argument("--db")
+    p.add_argument("--depth", type=int, help="reopen handled pages at this depth or deeper (default: the deepest reached)")
+    p.add_argument("--dry-run", action="store_true", help="just count, change nothing")
+    p.set_defaults(func=_cmd_reopen)
 
     args = parser.parse_args()
     asyncio.run(args.func(args))
