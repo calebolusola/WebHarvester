@@ -7,9 +7,10 @@ connections, power blips, flaky drives, and sites that fight back with rate
 limiting.
 
 Built to scrape conversational text for research and model training. Main target
-is Nairaland, the Reddit of Nigeria: millions of threads of Nigerian English
-conversation, which is exactly the kind of text underrepresented in public
-datasets and not available for download anywhere.
+is Nairaland, the Reddit of Nigeria: millions of threads of Nigerian English and
+Pidgin conversation, the kind of text public datasets barely have. The cleaned
+result is on Hugging Face as
+[nairaland-conversations](https://huggingface.co/datasets/caleb-mnb/nairaland-conversations).
 
 ## Design priorities (in order)
 
@@ -21,12 +22,12 @@ datasets and not available for download anywhere.
 
 ## Built on Crawlee, without reinventing the frontier
 
-The genuinely hard parts of a crawler (URL dedup, the request queue, robots.txt,
+The hard parts of a crawler (URL dedup, the request queue, robots.txt,
 session/cookie management, retry and backoff, browser fingerprinting) are solved
 better by [Crawlee](https://crawlee.dev/python/) than I'd solve them on a first
 pass. So WebHarvester is built on Crawlee, and the actual engineering here is the
 glue: keeping the database off the hot path, the distribution model, extraction
-quality, and surviving real world failure modes.
+quality, and surviving the things that actually go wrong.
 
 ## Architecture
 
@@ -61,8 +62,8 @@ out across every core.
 
 ### Storage
 
-Crawlee 1.x's `SqlStorageClient` is the keystone: same code path for SQLite or
-PostgreSQL.
+Crawlee 1.x's `SqlStorageClient` is what makes this simple: same code path for
+SQLite or PostgreSQL.
 
 - **Single machine:** SQLite on local disk, zero infrastructure.
 - **Mesh:** PostgreSQL on one machine, every node connects over LAN.
@@ -76,11 +77,11 @@ No leader, no message queue. Every node points at the same PostgreSQL frontier
 and claims work atomically. Because the request queue dedups by URL, adding a
 node is just pointing a second machine at the same connection string.
 
-Honest caveat: distribution helps against many different sites or when nodes
-have distinct IPs. It does not help against a single site that rate limits by
-IP if your nodes share one router, i.e one public IP. More nodes there just means
-more requests from the same IP and more rate limiting. Learned this the hard way,
-see below.
+Caveat: distribution helps against many different sites or when nodes have
+their own IPs. Against one site that rate limits by IP, nodes behind the same
+router just send more requests from the same IP and get rate limited sooner.
+Learned this the hard way. How I actually ran the mesh, and what went wrong, is
+in [docs/mesh.md](docs/mesh.md).
 
 ### Resumability
 
@@ -99,7 +100,7 @@ politely: a per-domain throttle honoring HTTP 429 and robots.txt crawl-delay,
 with exponential backoff per domain. No crawler solves captchas here, the goal
 is to avoid triggering them.
 
-### Extraction: structure, not soup
+### Extraction
 
 Lives in `crawler/extract/`:
 
@@ -114,14 +115,15 @@ Adding a site is one `extract(tree) -> dict` function registered in
 
 ### Observability without slowing the crawl
 
-At hundreds of pages/sec, logging every page becomes the bottleneck. The hot
-path is silent instead. Each node writes a heartbeat every few seconds; `status`
+Logging every page is mostly noise, and at speed it turns into a bottleneck, so
+the hot path is silent. Each node writes a heartbeat every few seconds; `status`
 queries the database for totals, throughput, top domains, errors, per-node
 breakdown. Reads the database, so it works from any machine and adds no load.
 
-## Problems hit, and fixes
+## Things that broke
 
-Real issues from running this against a real site on real hardware.
+None of this showed up in testing. All of it came from running against Nairaland
+for weeks.
 
 **exFAT corrupted SQLite.** External SSD was exFAT. First crawl corrupted the DB
 (`database disk image is malformed`) almost immediately, exFAT doesn't give
@@ -162,7 +164,10 @@ ten million crawlable pages; a polite single IP does 50-100k/day, months for a
 full mirror. Real fix was scope, not speed: since thread URLs carry no board
 name and the footer links every board, depth-bounded crawling from specific
 seed boards (stay on domain, bound depth) turns months into days while still
-producing a large, diverse, on-topic corpus. Tuned in `crawler.toml`.
+producing a large, diverse, on-topic corpus. The first pass ran at depth 4 and
+drained in a few weeks. After that I removed the cap and used `reopen` to pick up
+from the edge, since pages at the old limit had been handled with their links
+thrown away.
 
 **Quote attribution and lost line breaks.** Extracted threads had null quoted
 authors and run-together words. Nairaland puts the quoted author's anchor
@@ -170,6 +175,17 @@ authors and run-together words. Nairaland puts the quoted author's anchor
 `text_content()` silently drops. Fixed attribution to read the anchor inside the
 blockquote (and capture the `cite` attribute for the reply graph), and convert
 `<br>` to newlines before extracting text.
+
+**Every exclude pattern was a no-op.** Found this weeks in, when the corpus had
+132k reply-form pages and 13k login pages that were supposed to be excluded.
+Crawlee's `Glob` follows file path rules, where `*` stops at a slash, so
+`*nairaland.com/login*` can never match a URL. Patterns now compile through
+`fnmatch`, where `*` matches anything.
+
+**The forum started cloning itself.** With the depth cap gone,
+`www.nairaland.com.` (trailing dot) slipped through as "same domain". To the queue
+it's a different host, so nothing dedups against it, and every page on it links
+to more of it. Fix: an include pattern that only allows the canonical host.
 
 ## Usage
 
@@ -200,7 +216,10 @@ unattended runs:
 ./run.sh    # reads crawler.toml, auto resumes on crash, stops on clean finish or Ctrl-C
 ```
 
-### Mesh (multiple machines on a LAN)
+### Mesh (multiple machines, one frontier)
+
+Full setup, including Postgres over Tailscale, is in [docs/mesh.md](docs/mesh.md).
+The short version:
 
 ```sh
 DSN="postgresql+asyncpg://crawler:secret@192.168.1.50:5432/crawler"
@@ -246,6 +265,18 @@ sqlite3 "$DB" "select structure from corpus where extractor='nairaland' limit 1"
 | `status` | progress of the whole mesh, supports `--watch` and `--export` |
 | `init-db` | create the corpus, error, and heartbeat tables |
 | `reconcile` | re-enqueue previously failed URLs for another attempt |
+| `reopen` | re-queue pages at the depth edge so a deeper crawl can continue (`--dry-run` to just count) |
+
+## Releasing the dataset
+
+`scripts/build_release.py` turns the corpus into the public dataset: thread pages
+only, deduplicated, usernames and @handles swapped for keyed pseudonyms, contact
+details and social links scrubbed, languages tagged per post, written as Parquet
+shards with a dataset card. It needs `requirements-release.txt` and a salt file
+that stays private. Usage notes are at the top of the script.
+
+The current release: [caleb-mnb/nairaland-conversations](https://huggingface.co/datasets/caleb-mnb/nairaland-conversations)
+on Hugging Face, 1.9M thread pages and 34M posts, free for non-commercial research.
 
 ## Project layout
 
@@ -261,12 +292,19 @@ crawler/
     base.py       HTML cleaning + generic readability extractor
     nairaland.py  site-aware thread + quote-graph extractor
     registry.py   domain -> extractor
+scripts/
+  build_release.py  corpus -> public parquet dataset + card
+  start-host.sh     brings postgres and the mac's crawler back after a reboot
+  start-db.sh       just postgres
+  bootstrap-node.sh sets up a fresh ubuntu box as a mesh node
+  bench_ip.py       checks how a given IP fares against the target site
+docs/mesh.md      how the multi-machine setup ran, and what broke
 run.sh            set-and-forget supervisor
 crawler.toml      a real, tuned board-scoped Nairaland crawl
 crawler.example.toml  annotated template
 ```
 
-## Honest limitations
+## Limitations
 
 - Single IP against a strict site is slow and periodically rate limited. Real
   throughput at scale needs proxies, supported but not used here.
