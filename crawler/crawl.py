@@ -1,9 +1,11 @@
 import asyncio
+import fnmatch
 import os
+import re
 import time
 from concurrent.futures import ProcessPoolExecutor
 
-from crawlee import ConcurrencySettings, Glob
+from crawlee import ConcurrencySettings
 from crawlee.configuration import Configuration
 from crawlee.crawlers import BeautifulSoupCrawler, BeautifulSoupCrawlingContext
 from crawlee.http_clients import ImpitHttpClient
@@ -93,11 +95,19 @@ def _safe_stats(crawler):
         return 0, 0
 
 
+def url_pattern(glob: str) -> re.Pattern:
+    # crawlee's Glob uses file path rules, where * stops at "/". in a url that means
+    # "*nairaland.com/login*" never matches anything (the scheme has slashes in it),
+    # and the first crawl ran with every exclude silently doing nothing. here * is
+    # "anything", which is what a url pattern is always meant to say
+    return re.compile(fnmatch.translate(glob))
+
+
 def _domain_globs(cfg: Config):
-    # turn allowed_domains into include globs so enqueue_links enforces bounding
-    globs = [Glob(f"*://{d}/*") for d in cfg.allowed_domains]
-    globs += [Glob(f"*://*.{d}/*") for d in cfg.allowed_domains]
-    return globs
+    # turn allowed_domains into include patterns so enqueue_links enforces bounding
+    pats = [url_pattern(f"*://{d}/*") for d in cfg.allowed_domains]
+    pats += [url_pattern(f"*://*.{d}/*") for d in cfg.allowed_domains]
+    return pats
 
 
 _throttle_patched = False
@@ -219,8 +229,8 @@ async def run_crawl(cfg: Config):
     else:
         crawler = BeautifulSoupCrawler(http_client=_http_client(cfg), **kwargs)
 
-    include = [Glob(g) for g in cfg.include] + _domain_globs(cfg)
-    exclude = [Glob(g) for g in cfg.exclude]
+    include = [url_pattern(g) for g in cfg.include] + _domain_globs(cfg)
+    exclude = [url_pattern(g) for g in cfg.exclude]
     strategy = cfg.strategy
 
     transform = None
