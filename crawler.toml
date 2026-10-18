@@ -32,13 +32,16 @@ seeds = [
 # stay on nairaland. (footer links every board, so seeding boards biases what gets
 # crawled first; depth is what actually bounds the total.)
 strategy = "same-domain"
+# only the canonical host. same-domain also lets through "www.nairaland.com." (a
+# trailing dot is a different host to the queue, so nothing dedups against it) and
+# every page there links to more of it, so uncapped it mirrors the whole forum.
+include = ["*://www.nairaland.com/*"]
 
-# THE size knob. depth from each board seed:
-#   board page (0) -> threads + board pagination (1) -> their links (2) -> ...
-# 4 gets recent threads from each board + thread reply-pages + some cross-links.
-# raise for more history/breadth, lower for a quicker smaller pull. start here,
-# watch `status`, adjust.
-max_depth = 4
+# no depth cap. the first pass ran at max_depth = 4, which only reaches ~4 pages
+# into each board's history (board page N is N hops from page 1). same-domain +
+# the excludes below already fence this to nairaland, and dedup skips anything
+# crawled, so uncapped just means "keep going until the site runs out".
+# to cap it again: max_depth = 4
 
 # /Username profile pages are a third of the crawl and barely any unique text. skip them.
 skip_profiles = true
