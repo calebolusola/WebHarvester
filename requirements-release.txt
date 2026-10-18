@@ -1,0 +1,3 @@
+# only needed for scripts/build_release.py
+pyarrow>=15
+fasttext-wheel>=0.9.2
