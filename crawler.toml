@@ -53,6 +53,7 @@ exclude = [
   "*nairaland.com/register*",
   "*nairaland.com/newtopic*",
   "*nairaland.com/makenewpost*",
+  "*nairaland.com/newpost*",
   "*nairaland.com/reportpost*",
   "*nairaland.com/editpost*",
   "*nairaland.com/modifypost*",
@@ -65,6 +66,9 @@ exclude = [
   "*nairaland.com/techmarket*",
   "*nairaland.com/properties*",
   "*nairaland.com/do_*",
+  # /post/ID is a quote permalink that redirects into a thread we reach through the
+  # boards anyway. the first pass spent 1.6M fetches on these for ~1.5% new pages
+  "*nairaland.com/post/*",
 ]
 
 # politeness on one IP. honors 429 + crawl-delay, per-domain backoff.
